@@ -65,22 +65,18 @@ func do_uhd(filename string) (err error) {
 		slog.Debug("finished", "file", filename)
 		wg.Done()
 	}()
-	wg.Add(1)
-	go func() {
-		written, err := io.Copy(wr, rd)
-		slog.Debug("copy", "file", filename, "written", written, "err", err)
-		if err != nil {
-			slog.Error("copy", "file", filename, "err", err)
-		}
-		for _, w := range writers {
-			if closer, ok := w.(io.Closer); ok {
-				if err := closer.Close(); err != nil {
-					slog.Error("close writer", "file", filename, "err", err)
-				}
+	written, err := io.Copy(wr, rd)
+	slog.Debug("copy", "file", filename, "written", written, "err", err)
+	if err != nil {
+		slog.Error("copy", "file", filename, "err", err)
+	}
+	for _, w := range writers {
+		if closer, ok := w.(io.Closer); ok {
+			if err := closer.Close(); err != nil {
+				slog.Error("close writer", "file", filename, "err", err)
 			}
 		}
-		wg.Done()
-	}()
+	}
 	wg.Wait()
 	return nil
 }
