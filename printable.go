@@ -103,6 +103,9 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 				fmt.Fprint(h.output, ".")
 				h.cur += 1
 				runesrc = make([]byte, 0, 2)
+				if h.cur%uint64(h.width) == 0 {
+					fmt.Fprint(h.output, "\n")
+				}
 			}
 			if 0x20 <= ch && ch <= 0x7e {
 				fmt.Fprint(h.output, string(ch))
