@@ -25,7 +25,7 @@ type column struct {
 func do_uhd(filename string) (err error) {
 	layout := []column{
 		column{"header", 9},
-		column{"hexdump", 3*(option.Width) + (option.Width / 8) + 2},
+		column{"hexdump", 3*(option.Width) + (option.Width / 8) + 1},
 		column{"printable", option.Width},
 	}
 	var rd *os.File
@@ -42,12 +42,14 @@ func do_uhd(filename string) (err error) {
 	widths := make([]int, 0)
 	writers := make([]io.Writer, 0)
 	readers := make([]io.Reader, 0)
-	for _, col := range layout {
+	var dupidx int
+	for idx, col := range layout {
 		r, w := bufpipe.New(nil)
 		if col.name == "header" {
 			writers = append(writers, NewHeader(w, option.Width))
 		} else if col.name == "hexdump" {
 			writers = append(writers, NewHexdump(w, option.Width, option.Sep))
+			dupidx = idx
 		} else if col.name == "printable" {
 			writers = append(writers, NewPrintable(w, option.Encoding, option.Width))
 		}
@@ -55,7 +57,7 @@ func do_uhd(filename string) (err error) {
 		widths = append(widths, col.width)
 	}
 	wr := io.MultiWriter(writers...)
-	pst := NewPaster(os.Stdout, readers...)
+	pst := NewPaster(os.Stdout, dupidx, readers...)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -65,22 +67,18 @@ func do_uhd(filename string) (err error) {
 		slog.Debug("finished", "file", filename)
 		wg.Done()
 	}()
-	wg.Add(1)
-	go func() {
-		written, err := io.Copy(wr, rd)
-		slog.Debug("copy", "file", filename, "written", written, "err", err)
-		if err != nil {
-			slog.Error("copy", "file", filename, "err", err)
-		}
-		for _, w := range writers {
-			if closer, ok := w.(io.Closer); ok {
-				if err := closer.Close(); err != nil {
-					slog.Error("close writer", "file", filename, "err", err)
-				}
+	written, err := io.Copy(wr, rd)
+	slog.Debug("copy", "file", filename, "written", written, "err", err)
+	if err != nil {
+		slog.Error("copy", "file", filename, "err", err)
+	}
+	for _, w := range writers {
+		if closer, ok := w.(io.Closer); ok {
+			if err := closer.Close(); err != nil {
+				slog.Error("close writer", "file", filename, "err", err)
 			}
 		}
-		wg.Done()
-	}()
+	}
 	wg.Wait()
 	return nil
 }
