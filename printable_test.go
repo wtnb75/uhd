@@ -41,6 +41,24 @@ func TestPrintable_WriteUTF8(t *testing.T) {
 }
 
 //nolint:gosmopolitan
+func TestPrintable_WriteUTF8_emoji(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf-8", 16)
+	input := []byte("💩や🍺などの絵文字")
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "💩__や_🍺__な_ど\n_の_絵_文_字_\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
 func TestPrintable_WriteEUCJP(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "euc-jp", 8)
