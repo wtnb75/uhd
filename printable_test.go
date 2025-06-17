@@ -22,6 +22,7 @@ func TestPrintable_WriteASCII(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
 func TestPrintable_WriteUTF8(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 8)
@@ -39,6 +40,7 @@ func TestPrintable_WriteUTF8(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
 func TestPrintable_WriteEUCJP(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "euc-jp", 8)
@@ -53,6 +55,7 @@ func TestPrintable_WriteEUCJP(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
 func TestPrintable_WriteShiftJIS(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "shift-jis", 8)
