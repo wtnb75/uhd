@@ -24,9 +24,9 @@ type column struct {
 
 func do_uhd(filename string) (err error) {
 	layout := []column{
-		column{"header", 9},
-		column{"hexdump", 3*(option.Width) + (option.Width / 8) + 1},
-		column{"printable", option.Width},
+		{"header", 9},
+		{"hexdump", 3*(option.Width) + (option.Width / 8) + 1},
+		{"printable", option.Width},
 	}
 	var rd *os.File
 	if filename == "-" {
@@ -45,12 +45,13 @@ func do_uhd(filename string) (err error) {
 	var dupidx int
 	for idx, col := range layout {
 		r, w := bufpipe.New(nil)
-		if col.name == "header" {
+		switch col.name {
+		case "header":
 			writers = append(writers, NewHeader(w, option.Width))
-		} else if col.name == "hexdump" {
+		case "hexdump":
 			writers = append(writers, NewHexdump(w, option.Width, option.Sep))
 			dupidx = idx
-		} else if col.name == "printable" {
+		case "printable":
 			writers = append(writers, NewPrintable(w, option.Encoding, option.Width))
 		}
 		readers = append(readers, r)
