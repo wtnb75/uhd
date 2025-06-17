@@ -181,11 +181,12 @@ func (h *printable) writeUTF8(p []byte) (n int, err error) {
 }
 
 func (h *printable) Write(p []byte) (n int, err error) {
-	if h.encoding == "utf-8" {
+	switch h.encoding {
+	case "utf-8":
 		return h.writeUTF8(p)
-	} else if h.encoding == "euc-jp" {
+	case "euc-jp":
 		return h.writeEUCJP(p)
-	} else if h.encoding == "shift-jis" {
+	case "shift-jis":
 		return h.writeShiftJIS(p)
 	}
 	return h.writeASCII(p)

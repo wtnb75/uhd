@@ -15,7 +15,7 @@ type paster struct {
 
 func (p *paster) Process(widths ...int) error {
 	var prev []string
-	var in_dup bool = false
+	var in_dup = false
 	txts := make([]string, 0, len(p.readers))
 	for {
 		eof := true

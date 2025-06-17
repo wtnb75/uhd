@@ -16,11 +16,12 @@ type hexdump struct {
 func (h *hexdump) Write(p []byte) (n int, err error) {
 	for i, ch := range p {
 		fmt.Fprintf(h.output, " %02X", uint8(ch))
-		if (h.cur+uint64(i))%uint64(h.sep) == uint64(h.sep-1) {
-			fmt.Fprint(h.output, " ")
-		}
-		if (h.cur+uint64(i))%uint64(h.width) == uint64(h.width)-1 {
+		c := h.cur + uint64(i)
+		cw := int(c % uint64(h.width))
+		if cw == h.width-1 {
 			fmt.Fprint(h.output, "\n")
+		} else if cw%h.sep == h.sep-1 {
+			fmt.Fprint(h.output, " ")
 		}
 	}
 	h.cur += uint64(len(p))
