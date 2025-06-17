@@ -49,7 +49,10 @@ func TestPrintable_WriteEUCJP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
-	expected := "こんにち\nは世界.a\nbc..!."
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "こんにち\nは世界.a\nbc..!.\n"
 	if buf.String() != expected {
 		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
 	}
@@ -64,7 +67,10 @@ func TestPrintable_WriteShiftJIS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write error: %v", err)
 	}
-	expected := "こんにち\nは世界.a\nbc..!."
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "こんにち\nは世界.a\nbc..!.\n"
 	if buf.String() != expected {
 		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
 	}
@@ -74,8 +80,11 @@ func TestPrintable_Close(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 8)
 	_, _ = p.Write([]byte("abc"))
-	err := p.Close()
-	if err != nil {
+	if err := p.Close(); err != nil {
 		t.Errorf("Close error: %v", err)
+	}
+	expected := "abc\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
 	}
 }
