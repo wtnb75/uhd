@@ -20,12 +20,16 @@ type printable struct {
 	rest     []byte
 }
 
+func sjis_single(ch byte) bool {
+	return ch <= 0x7e || (0xa1 <= ch && ch <= 0xdf)
+}
+
 func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 	dec := japanese.ShiftJIS.NewDecoder()
 	runesrc := make([]byte, 0, 2)
 	mb := false
 	for _, ch := range p {
-		if len(runesrc) == 0 && !(ch <= 0x7e || (0xa1 <= ch && ch <= 0xdf)) {
+		if len(runesrc) == 0 && !sjis_single(ch) {
 			runesrc = append(runesrc, ch)
 			continue
 		} else if len(runesrc) == 1 {
