@@ -59,6 +59,24 @@ func TestPrintable_WriteUTF8_emoji(t *testing.T) {
 }
 
 //nolint:gosmopolitan
+func TestPrintable_WriteUTF8_hankana(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf-8", 16)
+	input := []byte("ﾊﾝｶｸｶﾅﾓｼﾞ")
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "ﾊ__ﾝ__ｶ__ｸ__ｶ__ﾅ\n__ﾓ__ｼ__ﾞ__\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
 func TestPrintable_WriteEUCJP(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "euc-jp", 8)
@@ -77,6 +95,24 @@ func TestPrintable_WriteEUCJP(t *testing.T) {
 }
 
 //nolint:gosmopolitan
+func TestPrintable_WriteEUCJP_hankaku(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "euc-jp", 8)
+	input := []byte{0x8e, 0xca, 0x8e, 0xdd, 0x8e, 0xb6, 0x8e, 0xb8, 0x8e, 0xb6, 0x8e, 0xc5, 0x8e, 0xd3, 0x8e, 0xbc, 0x8e, 0xde}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "ﾊ_ﾝ_ｶ_ｸ_\nｶ_ﾅ_ﾓ_ｼ_\nﾞ_\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
 func TestPrintable_WriteShiftJIS(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "shift-jis", 8)
@@ -88,7 +124,25 @@ func TestPrintable_WriteShiftJIS(t *testing.T) {
 	if err = p.Close(); err != nil {
 		t.Error("close", "err", err)
 	}
-	expected := "こんにち\nは世界.a\nbc..!.\n"
+	expected := "こんにち\nは世界.a\nbc....\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteShiftJIS_hankaku(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "shift-jis", 8)
+	input := []byte{0xca, 0xdd, 0xb6, 0xb8, 0xb6, 0xc5, 0xd3, 0xbc, 0xde}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "ﾊﾝｶｸｶﾅﾓｼ\nﾞ\n"
 	if buf.String() != expected {
 		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
 	}

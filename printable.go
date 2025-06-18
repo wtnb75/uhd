@@ -20,12 +20,16 @@ type printable struct {
 	rest     []byte
 }
 
+func sjis_single(ch byte) bool {
+	return ch <= 0x7e || (0xa1 <= ch && ch <= 0xdf)
+}
+
 func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 	dec := japanese.ShiftJIS.NewDecoder()
 	runesrc := make([]byte, 0, 2)
 	mb := false
 	for _, ch := range p {
-		if len(runesrc) == 0 && ch >= 0x80 {
+		if len(runesrc) == 0 && !sjis_single(ch) {
 			runesrc = append(runesrc, ch)
 			continue
 		} else if len(runesrc) == 1 {
@@ -37,7 +41,8 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 				h.cur += 1
 				mb = false
 			} else {
-				r, _ := utf8.DecodeRune(runesrc_u8)
+				r, size := utf8.DecodeRune(runesrc_u8)
+				slog.Info("decoded", "rune", r, "size", size)
 				if unicode.IsPrint(r) {
 					charwidth := h.runeWidth(r)
 					fmt.Fprintf(h.output, "%c", r)
@@ -54,6 +59,14 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 		} else {
 			if 0x20 <= ch && ch <= 0x7e {
 				fmt.Fprint(h.output, string(ch))
+			} else if 0xa1 <= ch && ch <= 0xdf {
+				runesrc_u8, err := dec.Bytes([]byte{ch})
+				if err != nil {
+					fmt.Fprint(h.output, ".")
+				} else {
+					r, _ := utf8.DecodeRune(runesrc_u8)
+					fmt.Fprintf(h.output, "%c", r)
+				}
 			} else {
 				fmt.Fprint(h.output, ".")
 			}
