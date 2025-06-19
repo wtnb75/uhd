@@ -15,6 +15,7 @@ var option struct {
 	Encoding string `long:"encoding" default:"utf-8"`
 	Width    int    `long:"width" default:"16"`
 	Sep      int    `long:"sep" default:"8"`
+	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd"`
 }
 
 type column struct {
@@ -22,13 +23,27 @@ type column struct {
 	width int
 }
 
-func do_uhd(filename string) (err error) {
-	layout := []column{
-		{"header", 9},
-		{"hexdump", 3*(option.Width) + (option.Width / 8) + 1},
-		{"printable", option.Width},
+func get_layout(predefined string) []column {
+	switch predefined {
+	case "jhd":
+		return []column{
+			{"header", 9},
+			{"hexdump", 3*(option.Width) + option.Width/option.Sep + (option.Width / 8) + 1},
+			{"printable", option.Width},
+		}
+	case "hexdump":
+		return []column{
+			{"header", 9},
+			{"hexdump_lower", 3*(option.Width) + option.Width/option.Sep + (option.Width / 8) + 1},
+			{"printable_pipe", option.Width + 2},
+		}
 	}
+	return []column{}
+}
+
+func do_uhd(filename string) (err error) {
 	var rd *os.File
+	var layout = get_layout(option.Layout)
 	if filename == "-" {
 		rd = os.Stdin
 	} else {
@@ -39,20 +54,27 @@ func do_uhd(filename string) (err error) {
 		}
 		defer rd.Close()
 	}
-	widths := make([]int, 0)
-	writers := make([]io.Writer, 0)
-	readers := make([]io.Reader, 0)
+	widths := make([]int, 0, len(layout))
+	writers := make([]io.Writer, 0, len(layout))
+	readers := make([]io.Reader, 0, len(layout))
 	var dupidx int
 	for idx, col := range layout {
 		r, w := bufpipe.New(nil)
 		switch col.name {
 		case "header":
 			writers = append(writers, NewHeader(w, option.Width))
+		case "header_lower":
+			writers = append(writers, NewHeaderLower(w, option.Width))
 		case "hexdump":
 			writers = append(writers, NewHexdump(w, option.Width, option.Sep))
 			dupidx = idx
+		case "hexdump_lower":
+			writers = append(writers, NewHexdumpLower(w, option.Width, option.Sep))
+			dupidx = idx
 		case "printable":
 			writers = append(writers, NewPrintable(w, option.Encoding, option.Width))
+		case "printable_pipe":
+			writers = append(writers, NewPrintableSep(w, option.Encoding, option.Width, "|", "|"))
 		}
 		readers = append(readers, r)
 		widths = append(widths, col.width)
@@ -62,6 +84,7 @@ func do_uhd(filename string) (err error) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		slog.Debug("widths", "values", widths)
 		if err := pst.Process(widths...); err != nil {
 			slog.Error("paster", "err", err)
 		}
@@ -93,10 +116,6 @@ func main() {
 	}
 	if option.Verbose {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
-	}
-	if option.Width%option.Sep != 0 {
-		slog.Error("width must be a multiple of sep", "width", option.Width, "sep", option.Sep)
-		return
 	}
 	if len(parsed) == 0 {
 		err := do_uhd("-")
