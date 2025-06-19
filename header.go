@@ -10,12 +10,17 @@ type header struct {
 	output io.Writer
 	cur    uint64
 	width  int
+	lower  bool
 }
 
 func (h *header) Write(p []byte) (n int, err error) {
 	for i := h.cur; i < h.cur+uint64(len(p)); i++ {
 		if i%uint64(h.width) == 0 {
-			fmt.Fprintf(h.output, "%08X\n", i)
+			if h.lower {
+				fmt.Fprintf(h.output, "%08x\n", i)
+			} else {
+				fmt.Fprintf(h.output, "%08X\n", i)
+			}
 		}
 	}
 	h.cur += uint64(len(p))
@@ -37,5 +42,15 @@ func NewHeader(output io.Writer, width int) *header {
 		output: output,
 		cur:    0,
 		width:  width,
+		lower:  false,
+	}
+}
+
+func NewHeaderLower(output io.Writer, width int) *header {
+	return &header{
+		output: output,
+		cur:    0,
+		width:  width,
+		lower:  true,
 	}
 }
