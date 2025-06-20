@@ -181,7 +181,7 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 		if h.cur%uint64(h.width) == 0 {
 			fmt.Fprint(h.output, h.start_ch)
 		}
-		if 0xa1 <= ch && ch <= 0xfe {
+		if (0xa1 <= ch && ch <= 0xfe) || ch == 0x8e {
 			runesrc = append(runesrc, ch)
 			if len(runesrc) == 2 {
 				runesrc_u8, err := dec.Bytes(runesrc)
