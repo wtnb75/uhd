@@ -22,8 +22,53 @@ type printable struct {
 	end_ch   string
 }
 
+type uintrange struct {
+	start uint
+	end   uint
+}
+
 func sjis_single(ch byte) bool {
 	return ch <= 0x7e || (0xa1 <= ch && ch <= 0xdf)
+}
+
+func valid_sjis(b1, b2 byte) bool {
+	// info from http://charset.7jp.net/sjis.html
+	invalid := []uintrange{
+		{0x81ad, 0x81b7},
+		{0x81c0, 0x81c7},
+		{0x81cf, 0x81d9},
+		{0x81e9, 0x81ef},
+		{0x81f8, 0x81fb},
+
+		{0x8240, 0x824e},
+		{0x8259, 0x825f},
+		{0x827a, 0x8280},
+		{0x829b, 0x829e},
+		{0x82f2, 0x82fc},
+
+		{0x8397, 0x839e},
+		{0x83b7, 0x83be},
+		{0x83d7, 0x83fc},
+
+		{0x8461, 0x846f},
+		{0x8492, 0x849e},
+		{0x84bf, 0x84fc},
+
+		{0x8540, 0x889e},
+
+		{0x9873, 0x989e},
+
+		{0xa040, 0xdffc},
+		{0xeaa5, 0xeffc},
+	}
+	ch := (uint(b1) << 8) | uint(b2)
+	for _, r := range invalid {
+		if r.start <= ch && ch <= r.end {
+			slog.Debug("invalid euc-jp", "b1", b1, "b2", b2, "ch", ch, "range", r)
+			return false
+		}
+	}
+	return true
 }
 
 func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
@@ -48,7 +93,9 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 			} else {
 				r, size := utf8.DecodeRune(runesrc_u8)
 				slog.Debug("decoded", "rune", r, "size", size)
-				if unicode.IsPrint(r) {
+				if !utf8.ValidRune(r) || !valid_sjis(runesrc[0], runesrc[1]) {
+					fmt.Fprint(h.output, "..")
+				} else if unicode.IsPrint(r) {
 					charwidth := h.runeWidth(r)
 					fmt.Fprintf(h.output, "%c", r)
 					if charwidth == 1 {
@@ -87,6 +134,45 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func valid_eucjp(b1, b2 byte) bool {
+	// info from http://charset.7jp.net/euc.html
+	invalid := []uintrange{
+		{0xa2af, 0xa2b9},
+		{0xa2c2, 0xa2c9},
+		{0xa2d1, 0xa2db},
+		{0xa2eb, 0xa2f1},
+		{0xa2fa, 0xa2fd},
+
+		{0xa3a1, 0xa3af},
+		{0xa3ba, 0xa3c0},
+		{0xa3db, 0xa3e0},
+		{0xa3fb, 0xa3fe},
+
+		{0xa4f4, 0xa4fe},
+
+		{0xa5f7, 0xa5fe},
+
+		{0xa6b9, 0xa6c0},
+		{0xa6d9, 0xa6fe},
+
+		{0xa7c2, 0xa7d0},
+		{0xa7f2, 0xa7fe},
+
+		{0xa8c1, 0xa8fe},
+
+		{0xa9a1, 0xaffe},
+		{0xf4a7, 0xfefe},
+	}
+	ch := (uint(b1) << 8) | uint(b2)
+	for _, r := range invalid {
+		if r.start <= ch && ch <= r.end {
+			slog.Debug("invalid euc-jp", "b1", b1, "b2", b2, "ch", ch, "range", r)
+			return false
+		}
+	}
+	return true
+}
+
 func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 	dec := japanese.EUCJP.NewDecoder()
 	runesrc := make([]byte, 0, 2)
@@ -95,7 +181,7 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 		if h.cur%uint64(h.width) == 0 {
 			fmt.Fprint(h.output, h.start_ch)
 		}
-		if ch >= 0x80 {
+		if 0xa1 <= ch && ch <= 0xfe {
 			runesrc = append(runesrc, ch)
 			if len(runesrc) == 2 {
 				runesrc_u8, err := dec.Bytes(runesrc)
@@ -103,7 +189,9 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 					fmt.Fprintf(h.output, "..")
 				} else {
 					r, _ := utf8.DecodeRune(runesrc_u8)
-					if unicode.IsPrint(r) {
+					if !utf8.ValidRune(r) || !valid_eucjp(runesrc[0], runesrc[1]) {
+						fmt.Fprint(h.output, "..")
+					} else if unicode.IsPrint(r) {
 						charwidth := h.runeWidth(r)
 						fmt.Fprintf(h.output, "%c", r)
 						if charwidth == 1 {
@@ -211,12 +299,12 @@ func (h *printable) writeUTF8(p []byte) (n int, err error) {
 }
 
 func (h *printable) Write(p []byte) (n int, err error) {
-	switch h.encoding {
-	case "utf-8":
+	switch strings.ToLower(h.encoding) {
+	case "utf-8", "utf8":
 		return h.writeUTF8(p)
-	case "euc-jp":
+	case "euc-jp", "eucjp":
 		return h.writeEUCJP(p)
-	case "shift-jis":
+	case "shift-jis", "sjis", "shiftjis":
 		return h.writeShiftJIS(p)
 	}
 	return h.writeASCII(p)
