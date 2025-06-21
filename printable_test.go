@@ -148,6 +148,129 @@ func TestPrintable_WriteShiftJIS_hankaku(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF16(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf16", 8)
+	input := []byte{0xfe, 0xff, 0x30, 0x53, 0x30, 0x93, 0x30, 0x6b, 0x30, 0x61, 0x30, 0x6f, 0x4e, 0x16, 0x75, 0x4c,
+		0x00, 0x00, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00, 0x01, 0x00, 0x7f, 0x00, 0x21, 0x00, 0x0a}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "BEこんに\nちは世界\n..a_b_c_\n....!_..\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF16_emoji(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf-16", 16)
+	input := []byte{0xfe, 0xff, 0xd8, 0x3d, 0xdc, 0xa9, 0x30, 0x84, 0xd8, 0x3c, 0xdf, 0x7a, 0x30, 0x6a, 0x30, 0x69,
+		0x30, 0x6e, 0x7d, 0x75, 0x65, 0x87, 0x5b, 0x57}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "BE💩__や🍺__など\nの絵文字\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF16_hankaku(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf16", 8)
+	input := []byte{0xfe, 0xff, 0xff, 0x8a, 0xff, 0x9d, 0xff, 0x76, 0xff, 0x78, 0xff, 0x76, 0xff, 0x85, 0xff, 0x93,
+		0xff, 0x7c, 0xff, 0x9e}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "BEﾊ_ﾝ_ｶ_\nｸ_ｶ_ﾅ_ﾓ_\nｼ_ﾞ_\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF32(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf32", 8)
+	input := []byte{0x00, 0x00, 0xfe, 0xff, 0x00, 0x00, 0x30, 0x53, 0x00, 0x00, 0x30, 0x93, 0x00, 0x00, 0x30, 0x6b,
+		0x00, 0x00, 0x30, 0x61, 0x00, 0x00, 0x30, 0x6f, 0x00, 0x00, 0x4e, 0x16, 0x00, 0x00, 0x75, 0x4c,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x61, 0x00, 0x00, 0x00, 0x62, 0x00, 0x00, 0x00, 0x63,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x21,
+	}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "_BE_こ__\nん__に__\nち__は__\n世__界__\n.___a___\nb___c___\n.___.___\n!___\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF32_emoji(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf-32", 16)
+	input := []byte{
+		0x00, 0x00, 0xfe, 0xff, 0x00, 0x01, 0xf4, 0xa9, 0x00, 0x00, 0x30, 0x84, 0x00, 0x01, 0xf3, 0x7a,
+		0x00, 0x00, 0x30, 0x6a, 0x00, 0x00, 0x30, 0x69, 0x00, 0x00, 0x30, 0x6e, 0x00, 0x00, 0x7d, 0x75,
+		0x00, 0x00, 0x65, 0x87, 0x00, 0x00, 0x5b, 0x57,
+	}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "_BE_💩__や__🍺__\nな__ど__の__絵__\n文__字__\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteUTF32_hankaku(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf32", 8)
+	input := []byte{
+		0x00, 0x00, 0xfe, 0xff, 0x00, 0x00, 0xff, 0x8a, 0x00, 0x00, 0xff, 0x9d, 0x00, 0x00, 0xff, 0x76,
+		0x00, 0x00, 0xff, 0x78, 0x00, 0x00, 0xff, 0x76, 0x00, 0x00, 0xff, 0x85, 0x00, 0x00, 0xff, 0x93,
+		0x00, 0x00, 0xff, 0x7c, 0x00, 0x00, 0xff, 0x9e,
+	}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "_BE_ﾊ___\nﾝ___ｶ___\nｸ___ｶ___\nﾅ___ﾓ___\nｼ___ﾞ___\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
 func TestPrintable_Close(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 8)

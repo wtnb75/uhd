@@ -15,7 +15,7 @@ var option struct {
 	Encoding string `long:"encoding" default:"utf-8"`
 	Width    int    `long:"width" default:"16"`
 	Sep      int    `long:"sep" default:"8"`
-	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd"`
+	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd" choice:"bytes"`
 }
 
 type column struct {
@@ -36,6 +36,12 @@ func get_layout(predefined string) []column {
 			{"header", 9},
 			{"hexdump_lower", 3*(option.Width) + option.Width/option.Sep + (option.Width / 8) + 1},
 			{"printable_pipe", option.Width + 2},
+		}
+	case "bytes":
+		return []column{
+			{"header", 9},
+			{"hexbytes_lower", 6*option.Width + 1},
+			{"printable", option.Width},
 		}
 	}
 	return []column{}
@@ -71,6 +77,10 @@ func do_uhd(filename string) (err error) {
 		case "hexdump_lower":
 			writers = append(writers, NewHexdumpLower(w, option.Width, option.Sep))
 			dupidx = idx
+		case "hexbytes":
+			writers = append(writers, NewHexbytes(w, option.Width))
+		case "hexbytes_lower":
+			writers = append(writers, NewHexbytesLower(w, option.Width))
 		case "printable":
 			writers = append(writers, NewPrintable(w, option.Encoding, option.Width))
 		case "printable_pipe":

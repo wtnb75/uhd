@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,6 +21,7 @@ type printable struct {
 	rest     []byte
 	start_ch string
 	end_ch   string
+	lendian  bool
 }
 
 type uintrange struct {
@@ -298,10 +300,167 @@ func (h *printable) writeUTF8(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func getcode_utf16(p []byte, lendian bool) (uint32, error) {
+	if len(p) < 2 {
+		return 0, fmt.Errorf("short bytes: %d", len(p))
+	}
+	if lendian {
+		return uint32(p[1])<<8 | uint32(p[0]), nil
+	}
+	return uint32(p[0])<<8 | uint32(p[1]), nil
+}
+
+func (h *printable) writeUTF16(p []byte) (n int, err error) {
+	// check bom
+	cur := 0
+	if p[0] == 0xff && p[1] == 0xfe {
+		h.lendian = true
+		fmt.Fprint(h.output, h.start_ch+"LE")
+		cur = 2
+	} else if p[0] == 0xfe && p[1] == 0xff {
+		h.lendian = false
+		fmt.Fprint(h.output, h.start_ch+"BE")
+		cur = 2
+	}
+	for cur < len(p) {
+		skip := 0
+		pos := int((h.cur + uint64(cur)) % uint64(h.width))
+		if pos == 0 {
+			fmt.Fprint(h.output, h.start_ch)
+		}
+		code, err := getcode_utf16(p[cur:], h.lendian)
+		if err != nil {
+			if len(p[cur:]) == 1 {
+				fmt.Fprint(h.output, ".")
+			}
+			break
+		}
+		if code&0b1111_1100_0000_0000 == 0b1101_1000_0000_0000 {
+			// surrogate pair 1st?
+			code2, err := getcode_utf16(p[cur+2:], h.lendian)
+			if err != nil {
+				fmt.Fprint(h.output, ".")
+				skip = 1
+			} else if code2&0b1111_1100_0000_0000 == 0b1101_1100_0000_0000 {
+				// surrogate pair 2nd
+				rcode := 0x10000 + ((code & 0b0000_0011_1111_1111) << 10) | (code2 & 0b0000_0011_1111_1111)
+				slog.Debug("rune", "code1", code, "code2", code2, "rune", rcode)
+				fmt.Fprint(h.output, string(rune(rcode)))
+				if pos+4 < h.width {
+					fmt.Fprint(h.output, "__")
+				}
+				skip = 4
+			} else {
+				fmt.Fprint(h.output, ".")
+				skip = 1
+			}
+		} else if code < 0x10000 {
+			ch := rune(code)
+			if unicode.IsPrint(ch) {
+				charwidth := h.runeWidth(ch)
+				if charwidth == 1 && pos+1 < h.width {
+					fmt.Fprint(h.output, string(ch)+"_")
+				} else {
+					fmt.Fprint(h.output, string(ch))
+				}
+			} else {
+				fmt.Fprint(h.output, "..")
+			}
+			skip = 2
+		}
+		if pos+skip >= h.width {
+			fmt.Fprint(h.output, h.end_ch+"\n")
+		}
+		if pos+skip > h.width {
+			fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", pos+skip-h.width))
+		}
+		cur += skip
+	}
+	h.cur += uint64(len(p))
+	return len(p), nil
+}
+
+func getcode_utf32(p []byte, lendian bool) (uint32, error) {
+	if len(p) < 4 {
+		return 0, fmt.Errorf("short bytes: %d", len(p))
+	}
+	if lendian {
+		return uint32(p[3])<<24 | uint32(p[2])<<16 | uint32(p[1])<<8 | uint32(p[0]), nil
+	}
+	return uint32(p[0])<<24 | uint32(p[1])<<16 | uint32(p[2])<<8 | uint32(p[3]), nil
+}
+
+func (h *printable) writeUTF32(p []byte) (n int, err error) {
+	// check bom
+	cur := 0
+	if bytes.Equal(p[:4], []byte{0x00, 0x00, 0xfe, 0xff}) {
+		h.lendian = false
+		fmt.Fprint(h.output, h.start_ch+"_BE_")
+		cur = 4
+	} else if bytes.Equal(p[:4], []byte{0xff, 0xfe, 0x00, 0x00}) {
+		h.lendian = true
+		fmt.Fprint(h.output, h.start_ch+"_LE_")
+		cur = 4
+	}
+	for cur < len(p) {
+		skip := 0
+		pos := int((h.cur + uint64(cur)) % uint64(h.width))
+		if pos == 0 {
+			fmt.Fprint(h.output, h.start_ch)
+		}
+		code, err := getcode_utf32(p[cur:], h.lendian)
+		if err != nil {
+			fmt.Fprint(h.output, strings.Repeat(".", len(p[cur:])))
+			break
+		}
+		if code <= 0x10ffff {
+			ch := rune(code)
+			if unicode.IsPrint(ch) {
+				charwidth := h.runeWidth(ch)
+				if pos+charwidth < h.width {
+					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", 4-charwidth))
+				} else {
+					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", h.width-(pos+charwidth)))
+				}
+			} else {
+				fmt.Fprint(h.output, ".___")
+			}
+			skip = 4
+		} else {
+			skip = 1
+		}
+		if pos+skip >= h.width {
+			fmt.Fprint(h.output, h.end_ch+"\n")
+		}
+		if pos+skip > h.width {
+			fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", pos+skip-h.width))
+		}
+		cur += skip
+	}
+	h.cur += uint64(len(p))
+	return len(p), nil
+}
+
 func (h *printable) Write(p []byte) (n int, err error) {
 	switch strings.ToLower(h.encoding) {
 	case "utf-8", "utf8":
 		return h.writeUTF8(p)
+	case "utf-16", "utf16":
+		return h.writeUTF16(p)
+	case "utf-16be", "utf16be":
+		h.lendian = false
+		return h.writeUTF16(p)
+	case "utf-16le", "utf16le":
+		h.lendian = true
+		return h.writeUTF16(p)
+	case "utf-32", "utf32":
+		return h.writeUTF32(p)
+	case "utf-32be", "utf32be":
+		h.lendian = false
+		return h.writeUTF32(p)
+	case "utf-23le", "utf32le":
+		h.lendian = true
+		return h.writeUTF32(p)
 	case "euc-jp", "eucjp":
 		return h.writeEUCJP(p)
 	case "shift-jis", "sjis", "shiftjis":
@@ -330,6 +489,7 @@ func NewPrintable(output io.Writer, encoding string, width int) *printable {
 		width:    width,
 		encoding: encoding,
 		rest:     make([]byte, 0),
+		lendian:  false,
 	}
 }
 
@@ -342,5 +502,6 @@ func NewPrintableSep(output io.Writer, encoding string, width int, start_ch, end
 		rest:     make([]byte, 0),
 		start_ch: start_ch,
 		end_ch:   end_ch,
+		lendian:  false,
 	}
 }
