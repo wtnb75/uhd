@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
@@ -379,6 +380,67 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func getcode_utf32(p []byte, lendian bool) (uint32, error) {
+	if len(p) < 4 {
+		return 0, fmt.Errorf("short bytes: %d", len(p))
+	}
+	if lendian {
+		return uint32(p[3])<<24 | uint32(p[2])<<16 | uint32(p[1])<<8 | uint32(p[0]), nil
+	}
+	return uint32(p[0])<<24 | uint32(p[1])<<16 | uint32(p[2])<<8 | uint32(p[3]), nil
+}
+
+func (h *printable) writeUTF32(p []byte) (n int, err error) {
+	// check bom
+	cur := 0
+	if bytes.Equal(p[:4], []byte{0x00, 0x00, 0xfe, 0xff}) {
+		h.lendian = false
+		fmt.Fprint(h.output, h.start_ch+"_BE_")
+		cur = 4
+	} else if bytes.Equal(p[:4], []byte{0xff, 0xfe, 0x00, 0x00}) {
+		h.lendian = true
+		fmt.Fprint(h.output, h.start_ch+"_LE_")
+		cur = 4
+	}
+	for cur < len(p) {
+		skip := 0
+		pos := int((h.cur + uint64(cur)) % uint64(h.width))
+		if pos == 0 {
+			fmt.Fprint(h.output, h.start_ch)
+		}
+		code, err := getcode_utf32(p[cur:], h.lendian)
+		if err != nil {
+			fmt.Fprint(h.output, strings.Repeat(".", len(p[cur:])))
+			break
+		}
+		if code <= 0x10ffff {
+			ch := rune(code)
+			if unicode.IsPrint(ch) {
+				charwidth := h.runeWidth(ch)
+				if pos+charwidth < h.width {
+					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", 4-charwidth))
+				} else {
+					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", h.width-(pos+charwidth)))
+				}
+			} else {
+				fmt.Fprint(h.output, ".___")
+			}
+			skip = 4
+		} else {
+			skip = 1
+		}
+		if pos+skip >= h.width {
+			fmt.Fprint(h.output, h.end_ch+"\n")
+		}
+		if pos+skip > h.width {
+			fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", pos+skip-h.width))
+		}
+		cur += skip
+	}
+	h.cur += uint64(len(p))
+	return len(p), nil
+}
+
 func (h *printable) Write(p []byte) (n int, err error) {
 	switch strings.ToLower(h.encoding) {
 	case "utf-8", "utf8":
@@ -391,6 +453,14 @@ func (h *printable) Write(p []byte) (n int, err error) {
 	case "utf-16le", "utf16le":
 		h.lendian = true
 		return h.writeUTF16(p)
+	case "utf-32", "utf32":
+		return h.writeUTF32(p)
+	case "utf-32be", "utf32be":
+		h.lendian = false
+		return h.writeUTF32(p)
+	case "utf-23le", "utf32le":
+		h.lendian = true
+		return h.writeUTF32(p)
 	case "euc-jp", "eucjp":
 		return h.writeEUCJP(p)
 	case "shift-jis", "sjis", "shiftjis":
