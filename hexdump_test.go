@@ -26,3 +26,24 @@ func TestHexdump(t *testing.T) {
 		t.Error("mismatch", "output", output, "expected", expected)
 	}
 }
+
+func TestHexdumpLower(t *testing.T) {
+	buf := &bytes.Buffer{}
+	hex := NewHexdumpLower(buf, 16, 8)
+	input := "hello world 1234567890"
+	expected := " 68 65 6c 6c 6f 20 77 6f  72 6c 64 20 31 32 33 34\n 35 36 37 38 39 30\n"
+	n, err := fmt.Fprint(hex, input)
+	if err != nil {
+		t.Error("write", "err", err)
+	}
+	if err = hex.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	if n != len(input) {
+		t.Error("short write", "n", n, "expected", len(input))
+	}
+	output := buf.String()
+	if output != expected {
+		t.Error("mismatch", "output", output, "expected", expected)
+	}
+}
