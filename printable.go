@@ -9,7 +9,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/korean"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/traditionalchinese"
 	"golang.org/x/text/width"
 )
 
@@ -175,8 +179,68 @@ func valid_eucjp(b1, b2 byte) bool {
 	return true
 }
 
-func (h *printable) writeEUCJP(p []byte) (n int, err error) {
-	dec := japanese.EUCJP.NewDecoder()
+func valid_euckr(b1, b2 byte) bool {
+	// info from https://uic.jp/charset/show/euc-kr/
+	invalid := []uintrange{
+		{0xa2e8, 0xa2ff},
+		{0xa5ab, 0xa5af},
+		{0xa5ba, 0xa5c0},
+		{0xa5d9, 0xa5e0},
+		{0xa5f9, 0xa6a0},
+		{0xa6e5, 0xa7a0},
+		{0xa8a5, 0xa8a5},
+		{0xa8a7, 0xa8a7},
+		{0xa8b0, 0xa8b0},
+		{0xaaf4, 0xaaff},
+		{0xabf7, 0xabff},
+		{0xacc2, 0xacd0},
+		{0xacf2, 0xacff},
+		{0xfdff, 0xffff},
+	}
+	if b2 == 0xa0 || b2 == 0xff {
+		return false
+	}
+	ch := (uint(b1) << 8) | uint(b2)
+	for _, r := range invalid {
+		if r.start <= ch && ch <= r.end {
+			slog.Debug("invalid euc-kr", "b1", b1, "b2", b2, "ch", ch, "range", r)
+			return false
+		}
+	}
+	return true
+}
+
+func valid_euccn(b1, b2 byte) bool {
+	// info from https://uic.jp/charset/show/euc-cn/
+	invalid := []uintrange{
+		{0xa2e3, 0xa2e4},
+		{0xa2ef, 0xa2f0},
+		{0xa2fd, 0xa2ff},
+		{0xa4f4, 0xa4ff},
+		{0xa5f7, 0xa5ff},
+		{0xa6b9, 0xa6c0},
+		{0xa6d9, 0xa7a0},
+		{0xa7c2, 0xa7d0},
+		{0xa7f2, 0xa8a0},
+		{0xa8bb, 0xa8c4},
+		{0xa8ea, 0xa9a3},
+		{0xa9f0, 0xb0a0},
+		{0xf7ff, 0xffff},
+	}
+	if b2 == 0xa0 || b2 == 0xff {
+		return false
+	}
+	ch := (uint(b1) << 8) | uint(b2)
+	for _, r := range invalid {
+		if r.start <= ch && ch <= r.end {
+			slog.Debug("invalid euc-cn", "b1", b1, "b2", b2, "ch", ch, "range", r)
+			return false
+		}
+	}
+	return true
+}
+
+func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, b2 byte) bool) (n int, err error) {
 	runesrc := make([]byte, 0, 2)
 	mb := false
 	for _, ch := range p {
@@ -191,7 +255,7 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 					fmt.Fprintf(h.output, "..")
 				} else {
 					r, _ := utf8.DecodeRune(runesrc_u8)
-					if !utf8.ValidRune(r) || !valid_eucjp(runesrc[0], runesrc[1]) {
+					if !utf8.ValidRune(r) || !valid(runesrc[0], runesrc[1]) {
 						fmt.Fprint(h.output, "..")
 					} else if unicode.IsPrint(r) {
 						charwidth := h.runeWidth(r)
@@ -209,6 +273,85 @@ func (h *printable) writeEUCJP(p []byte) (n int, err error) {
 			} else {
 				continue
 			}
+		} else {
+			if len(runesrc) > 0 {
+				fmt.Fprint(h.output, ".")
+				h.cur += 1
+				runesrc = make([]byte, 0, 2)
+				if h.cur%uint64(h.width) == 0 {
+					fmt.Fprint(h.output, h.end_ch+"\n")
+				}
+			}
+			if 0x20 <= ch && ch <= 0x7e {
+				fmt.Fprint(h.output, string(ch))
+			} else {
+				fmt.Fprint(h.output, ".")
+			}
+			h.cur += 1
+			mb = false
+		}
+		if h.cur%uint64(h.width) == 0 {
+			fmt.Fprint(h.output, h.end_ch+"\n")
+		}
+		if mb && h.cur%uint64(h.width) == 1 {
+			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+		}
+	}
+	return len(p), nil
+}
+
+func (h *printable) writeEUCJP(p []byte) (n int, err error) {
+	dec := japanese.EUCJP.NewDecoder()
+	return h.writeEUCAny(p, dec, valid_eucjp)
+}
+
+func (h *printable) writeEUCKR(p []byte) (n int, err error) {
+	dec := korean.EUCKR.NewDecoder()
+	return h.writeEUCAny(p, dec, valid_euckr)
+}
+
+func (h *printable) writeEUCCN(p []byte) (n int, err error) {
+	dec := simplifiedchinese.GB18030.NewDecoder()
+	return h.writeEUCAny(p, dec, valid_euccn)
+}
+
+func valid_big5(b1, b2 byte) bool {
+	return true
+}
+
+func (h *printable) writeBig5(p []byte) (n int, err error) {
+	dec := traditionalchinese.Big5.NewDecoder()
+	runesrc := make([]byte, 0, 2)
+	mb := false
+	for _, ch := range p {
+		if h.cur%uint64(h.width) == 0 {
+			fmt.Fprint(h.output, h.start_ch)
+		}
+		if len(runesrc) == 0 && 0xa1 <= ch && ch <= 0xf9 {
+			runesrc = append(runesrc, ch)
+			continue
+		} else if len(runesrc) == 1 && 0x40 <= ch && ch <= 0xfe {
+			runesrc = append(runesrc, ch)
+			runesrc_u8, err := dec.Bytes(runesrc)
+			if err != nil {
+				fmt.Fprintf(h.output, "..")
+			} else {
+				r, _ := utf8.DecodeRune(runesrc_u8)
+				if !utf8.ValidRune(r) || !valid_big5(runesrc[0], runesrc[1]) {
+					fmt.Fprint(h.output, "..")
+				} else if unicode.IsPrint(r) {
+					charwidth := h.runeWidth(r)
+					fmt.Fprintf(h.output, "%c", r)
+					if charwidth == 1 {
+						fmt.Fprint(h.output, "_")
+					}
+				} else {
+					fmt.Fprint(h.output, "..")
+				}
+			}
+			runesrc = make([]byte, 0, 2)
+			h.cur += 2
+			mb = true
 		} else {
 			if len(runesrc) > 0 {
 				fmt.Fprint(h.output, ".")
@@ -463,7 +606,13 @@ func (h *printable) Write(p []byte) (n int, err error) {
 		return h.writeUTF32(p)
 	case "euc-jp", "eucjp":
 		return h.writeEUCJP(p)
-	case "shift-jis", "sjis", "shiftjis":
+	case "euc-kr", "euckr":
+		return h.writeEUCKR(p)
+	case "euc-cn", "euccn", "gb18030":
+		return h.writeEUCCN(p)
+	case "big5":
+		return h.writeBig5(p)
+	case "shift-jis", "sjis", "shiftjis", "cp932", "cp-932", "windows-31j":
 		return h.writeShiftJIS(p)
 	}
 	return h.writeASCII(p)
