@@ -307,6 +307,7 @@ func TestPrintable_WriteEUCKR(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
 func TestPrintable_WriteEUCCN(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "euc-cn", 8)
@@ -324,6 +325,7 @@ func TestPrintable_WriteEUCCN(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
 func TestPrintable_WriteBig5(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "big5", 8)
