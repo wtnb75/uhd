@@ -41,6 +41,24 @@ func TestPrintable_WriteUTF8(t *testing.T) {
 }
 
 //nolint:gosmopolitan
+func TestPrintable_WriteUTF8_kr(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "utf-8", 8)
+	input := []byte("안녕히계십시오")
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "안_녕_히\n_계_십_시\n__오_\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
 func TestPrintable_WriteUTF8_emoji(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 16)
@@ -266,6 +284,58 @@ func TestPrintable_WriteUTF32_hankaku(t *testing.T) {
 		t.Error("close", "err", err)
 	}
 	expected := "_BE_ﾊ___\nﾝ___ｶ___\nｸ___ｶ___\nﾅ___ﾓ___\nｼ___ﾞ___\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+//nolint:gosmopolitan
+func TestPrintable_WriteEUCKR(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "euc-kr", 8)
+	input := []byte{0xbe, 0xc8, 0xb3, 0xe7, 0xc8, 0xf7, 0xb0, 0xe8, 0xbd, 0xca, 0xbd, 0xc3, 0xbf, 0xc0}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "안녕히계\n십시오\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+func TestPrintable_WriteEUCCN(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "euc-cn", 8)
+	input := []byte{0xc4, 0xe3, 0xba, 0xc3, 0xce, 0xd2, 0xba, 0xc3}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "你好我好\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
+func TestPrintable_WriteBig5(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "big5", 8)
+	input := []byte{0xa7, 0x41, 0xa6, 0x6e, 0xa7, 0xda, 0xa6, 0x6e}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "你好我好\n"
 	if buf.String() != expected {
 		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
 	}
