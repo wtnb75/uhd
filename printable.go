@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -584,6 +585,50 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byte) bool) (n int, err error) {
+	runesrc := make([]byte, 0, 2)
+	mb := false
+	for _, ch := range p {
+		skip := 0
+		if h.cur%uint64(h.width) == 0 {
+			fmt.Fprint(h.output, h.start_ch)
+		}
+		runesrc = append(runesrc, ch)
+		runesrc_u8, err := dec.Bytes(runesrc)
+		if err != nil && len(runesrc) <= 3 {
+			continue
+		}
+		if err != nil {
+			fmt.Fprintf(h.output, "..")
+			runesrc = runesrc[1:]
+			skip = 1
+		} else {
+			r, _ := utf8.DecodeRune(runesrc_u8)
+			skip = len(runesrc_u8)
+			runesrc = make([]byte, 0, 2)
+			if !utf8.ValidRune(r) || !valid(runesrc_u8) {
+				fmt.Fprint(h.output, strings.Repeat(".", len(runesrc_u8)))
+			} else if unicode.IsPrint(r) {
+				charwidth := h.runeWidth(r)
+				fmt.Fprintf(h.output, "%c", r)
+				if charwidth == 1 {
+					fmt.Fprint(h.output, strings.Repeat("_", len(runesrc_u8)-charwidth))
+				}
+			} else {
+				fmt.Fprint(h.output, strings.Repeat(".", len(runesrc_u8)))
+			}
+		}
+		h.cur += uint64(skip)
+		if h.cur%uint64(h.width) == 0 {
+			fmt.Fprint(h.output, h.end_ch+"\n")
+		}
+		if mb && h.cur%uint64(h.width) == 1 {
+			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+		}
+	}
+	return len(p), nil
+}
+
 func (h *printable) Write(p []byte) (n int, err error) {
 	switch strings.ToLower(h.encoding) {
 	case "utf-8", "utf8":
@@ -615,6 +660,21 @@ func (h *printable) Write(p []byte) (n int, err error) {
 	case "shift-jis", "sjis", "shiftjis", "cp932", "cp-932", "windows-31j":
 		return h.writeShiftJIS(p)
 	}
+	for _, cm := range charmap.All {
+		name := fmt.Sprintf("%s", cm)
+		if strings.Contains(name, "enc=") {
+			tok := strings.SplitN(name, "enc=", 2)
+			if len(tok) == 2 {
+				name = strings.Trim(tok[1], "\"")
+			}
+		}
+		if strings.EqualFold(name, h.encoding) {
+			dec := cm.NewDecoder()
+			slog.Debug("using decoder", "name", name)
+			return h.writeAny(p, dec, func(b []byte) bool { return true })
+		}
+	}
+	slog.Debug("using ascii")
 	return h.writeASCII(p)
 }
 

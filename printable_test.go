@@ -343,6 +343,24 @@ func TestPrintable_WriteBig5(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
+func TestPrintable_Write8859_1(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintable(buf, "iso 8859-1", 8)
+	input := []byte{0x48, 0xe4, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0xf6, 0x72, 0x6c, 0x64}
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "Hä_llo W\nö_rld\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
 func TestPrintable_Close(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 8)
