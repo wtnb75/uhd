@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/acomagu/bufpipe"
 	"github.com/jessevdk/go-flags"
+	"golang.org/x/text/encoding/charmap"
 )
 
 var option struct {
@@ -16,6 +19,7 @@ var option struct {
 	Width    int    `long:"width" default:"16"`
 	Sep      int    `long:"sep" default:"8"`
 	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd" choice:"bytes"`
+	ListCode bool   `short:"l" long:"list-codes" description:"list encoding"`
 }
 
 type column struct {
@@ -126,6 +130,27 @@ func main() {
 	}
 	if option.Verbose {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+	if option.ListCode {
+		fmt.Println("utf-8, utf8")
+		fmt.Println("utf-16, utf16, utf-16be, utf16be, utf-16le, utf16le")
+		fmt.Println("utf-32, utf32, utf-32be, utf32be, utf-23le, utf32le")
+		fmt.Println("euc-jp, eucjp")
+		fmt.Println("euc-kr, euckr")
+		fmt.Println("euc-cn, euccn, gb18030")
+		fmt.Println("big5")
+		fmt.Println("shift-jis, sjis, shiftjis, cp932, cp-932, windows-31j")
+		for _, cm := range charmap.All {
+			name := fmt.Sprintf("%s", cm)
+			if strings.Contains(name, "enc=") {
+				tok := strings.SplitN(name, "enc=", 2)
+				if len(tok) == 2 {
+					name = strings.Trim(tok[1], "\"")
+				}
+			}
+			fmt.Println(name)
+		}
+		return
 	}
 	if len(parsed) == 0 {
 		err := do_uhd("-")
