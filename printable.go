@@ -79,6 +79,7 @@ func valid_sjis(b1, b2 byte) bool {
 }
 
 func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
+	p = append(h.rest, p...)
 	dec := japanese.ShiftJIS.NewDecoder()
 	runesrc := make([]byte, 0, 2)
 	mb := false
@@ -138,6 +139,7 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
 		}
 	}
+	h.rest = runesrc
 	return len(p), nil
 }
 
@@ -242,6 +244,7 @@ func valid_euccn(b1, b2 byte) bool {
 }
 
 func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, b2 byte) bool) (n int, err error) {
+	p = append(h.rest, p...)
 	runesrc := make([]byte, 0, 2)
 	mb := false
 	for _, ch := range p {
@@ -298,6 +301,7 @@ func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, 
 			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
 		}
 	}
+	h.rest = runesrc
 	return len(p), nil
 }
 
@@ -323,6 +327,7 @@ func valid_big5(b1, b2 byte) bool {
 func (h *printable) writeBig5(p []byte) (n int, err error) {
 	dec := traditionalchinese.Big5.NewDecoder()
 	runesrc := make([]byte, 0, 2)
+	p = append(h.rest, p...)
 	mb := false
 	for _, ch := range p {
 		if h.cur%uint64(h.width) == 0 {
@@ -377,6 +382,7 @@ func (h *printable) writeBig5(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
 		}
 	}
+	h.rest = runesrc
 	return len(p), nil
 }
 
@@ -455,6 +461,7 @@ func getcode_utf16(p []byte, lendian bool) (uint32, error) {
 }
 
 func (h *printable) writeUTF16(p []byte) (n int, err error) {
+	p = append(h.rest, p...)
 	// check bom
 	cur := 0
 	if p[0] == 0xff && p[1] == 0xfe {
@@ -474,17 +481,13 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 		}
 		code, err := getcode_utf16(p[cur:], h.lendian)
 		if err != nil {
-			if len(p[cur:]) == 1 {
-				fmt.Fprint(h.output, ".")
-			}
 			break
 		}
 		if code&0b1111_1100_0000_0000 == 0b1101_1000_0000_0000 {
 			// surrogate pair 1st?
 			code2, err := getcode_utf16(p[cur+2:], h.lendian)
 			if err != nil {
-				fmt.Fprint(h.output, ".")
-				skip = 1
+				break
 			} else if code2&0b1111_1100_0000_0000 == 0b1101_1100_0000_0000 {
 				// surrogate pair 2nd
 				rcode := 0x10000 + ((code & 0b0000_0011_1111_1111) << 10) | (code2 & 0b0000_0011_1111_1111)
@@ -520,7 +523,8 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 		}
 		cur += skip
 	}
-	h.cur += uint64(len(p))
+	h.cur += uint64(cur)
+	h.rest = p[cur:]
 	return len(p), nil
 }
 
@@ -535,6 +539,7 @@ func getcode_utf32(p []byte, lendian bool) (uint32, error) {
 }
 
 func (h *printable) writeUTF32(p []byte) (n int, err error) {
+	p = append(h.rest, p...)
 	// check bom
 	cur := 0
 	if bytes.Equal(p[:4], []byte{0x00, 0x00, 0xfe, 0xff}) {
@@ -554,7 +559,6 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 		}
 		code, err := getcode_utf32(p[cur:], h.lendian)
 		if err != nil {
-			fmt.Fprint(h.output, strings.Repeat(".", len(p[cur:])))
 			break
 		}
 		if code <= 0x10ffff {
@@ -581,12 +585,14 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 		}
 		cur += skip
 	}
-	h.cur += uint64(len(p))
+	h.cur += uint64(cur)
+	h.rest = p[cur:]
 	return len(p), nil
 }
 
 func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byte) bool) (n int, err error) {
 	runesrc := make([]byte, 0, 2)
+	runesrc = append(h.rest, runesrc...)
 	mb := false
 	for _, ch := range p {
 		skip := 0
@@ -626,6 +632,7 @@ func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byt
 			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
 		}
 	}
+	h.rest = runesrc
 	return len(p), nil
 }
 
@@ -679,6 +686,8 @@ func (h *printable) Write(p []byte) (n int, err error) {
 }
 
 func (h *printable) Close() (err error) {
+	fmt.Fprint(h.output, strings.Repeat(".", len(h.rest)))
+	h.cur += uint64(len(h.rest))
 	if h.cur%uint64(h.width) != 0 {
 		fmt.Fprint(h.output, "\n")
 	}
