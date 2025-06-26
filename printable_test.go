@@ -442,6 +442,24 @@ func TestPrintable_Write8859_1(t *testing.T) {
 	}
 }
 
+//nolint:gosmopolitan
+func TestPrintable_WriteMultiLingual(t *testing.T) {
+	buf := &bytes.Buffer{}
+	p := NewPrintableSep(buf, "utf-8", 16, "|", "|")
+	input := []byte("Привіт, світе\nสวัสดีชาวโลก\nhello, world\n")
+	_, err := p.Write(input)
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if err = p.Close(); err != nil {
+		t.Error("close", "err", err)
+	}
+	expected := "|П_р_и_в_і_т_, с_|\n|в_і_т_е_.ส__ว__ั\n|__ส__ด__ี__ช__า\n|_ว__โ__ล__ก__.he|\n|llo, world.\n"
+	if buf.String() != expected {
+		t.Errorf("unexpected output:\ngot:  %q\nwant: %q", buf.String(), expected)
+	}
+}
+
 func TestPrintable_Close(t *testing.T) {
 	buf := &bytes.Buffer{}
 	p := NewPrintable(buf, "utf-8", 8)
