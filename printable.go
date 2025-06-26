@@ -406,10 +406,12 @@ func (h *printable) writeASCII(p []byte) (n int, err error) {
 
 func (h *printable) runeWidth(r rune) int {
 	prop := width.LookupRune(r)
-	if prop.Kind() == width.EastAsianNarrow || prop.Kind() == width.EastAsianHalfwidth || prop.Kind() == width.Neutral {
+	switch prop.Kind() {
+	case width.EastAsianWide, width.EastAsianFullwidth:
+		return 2
+	default:
 		return 1
 	}
-	return 2
 }
 
 func (h *printable) writeUTF8(p []byte) (n int, err error) {
