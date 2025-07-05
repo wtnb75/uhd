@@ -1,4 +1,4 @@
-# uhd: hexdump supports text encodings
+# uhd: hexdump with text encodings
 
 ## Install
 
@@ -36,7 +36,7 @@ simple dump
 00000000  68 65 6C 6C 6F 20 77 6F  72 6C 64 0A                hello world.
 ```
 
-utf-8
+utf-8(default encoding)
 
 ```plaintext
 # echo こんにちわ、🍺はいかがですか | uhd
