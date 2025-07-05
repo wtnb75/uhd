@@ -125,7 +125,6 @@ func main() {
 	parser := flags.NewParser(&option, flags.Default)
 	parsed, err := parser.Parse()
 	if err != nil {
-		slog.Error("parse", "err", err)
 		return
 	}
 	if option.Verbose {
