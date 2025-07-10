@@ -57,6 +57,21 @@ other encodings
 00000000  CA DB B0 DC B0 D9 C4 DE  0A                         ﾊﾛｰﾜｰﾙﾄﾞ.
 ```
 
+binaries: `ﾍ!` in shift-jis = `int 21h`(ms-dos syscall)
+
+```plaintext
+# uhd hello.com
+00000000  EB 00 B4 09 BA 10 01 CD  21 B4 4C 30 C0 CD 21 00    ........!.L0..!.
+00000010  48 65 6C 6C 6F 2C 20 57  6F 72 6C 64 21 00          Hello, World!.
+# uhd hello.com --encoding shift-jis
+00000000  EB 00 B4 09 BA 10 01 CD  21 B4 4C 30 C0 CD 21 00    ..ｴ.ｺ..ﾍ!ｴL0ﾀﾍ!.
+00000010  48 65 6C 6C 6F 2C 20 57  6F 72 6C 64 21 00          Hello, World!.
+# uhd do-exit.com
+00000000  B4 00 CD 21                                         ....
+# uhd do-exit.com --encoding shift-jis
+00000000  B4 00 CD 21                                         ｴ.ﾍ!
+```
+
 # see also
 
 - jhd
