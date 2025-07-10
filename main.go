@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/acomagu/bufpipe"
+	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/text/encoding/charmap"
 )
@@ -20,6 +21,7 @@ var option struct {
 	Sep      int    `long:"sep" default:"8"`
 	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd" choice:"bytes"`
 	ListCode bool   `short:"l" long:"list-codes" description:"list encoding"`
+	NoColor  bool   `long:"no-color" description:"disable color output"`
 }
 
 type column struct {
@@ -126,6 +128,9 @@ func main() {
 	parsed, err := parser.Parse()
 	if err != nil {
 		return
+	}
+	if option.NoColor {
+		color.NoColor = true
 	}
 	if option.Verbose {
 		slog.SetLogLoggerLevel(slog.LevelDebug)

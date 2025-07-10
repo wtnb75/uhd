@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/fatih/color"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/japanese"
@@ -78,6 +79,31 @@ func valid_sjis(b1, b2 byte) bool {
 	return true
 }
 
+func (h *printable) pad1(n int) {
+	if n > 0 {
+		fmt.Fprint(h.output, color.BlueString(strings.Repeat(".", n)))
+	}
+}
+
+func (h *printable) pad2(n int) {
+	if n > 0 {
+		fmt.Fprint(h.output, color.CyanString(strings.Repeat("_", n)))
+	}
+}
+
+func (h *printable) bom(width int, is_little bool) {
+	var s string
+	if is_little {
+		s = "LE"
+	} else {
+		s = "BE"
+	}
+	if width == 4 {
+		s = "_" + s + "_"
+	}
+	fmt.Fprint(h.output, color.GreenString(s))
+}
+
 func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 	p = append(h.rest, p...)
 	dec := japanese.ShiftJIS.NewDecoder()
@@ -94,7 +120,7 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 			runesrc = append(runesrc, ch)
 			runesrc_u8, err := dec.Bytes(runesrc)
 			if err != nil {
-				fmt.Fprintf(h.output, ".")
+				h.pad1(1)
 				runesrc = runesrc[1:]
 				h.cur += 1
 				mb = false
@@ -102,15 +128,15 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 				r, size := utf8.DecodeRune(runesrc_u8)
 				slog.Debug("decoded", "rune", r, "size", size)
 				if !utf8.ValidRune(r) || !valid_sjis(runesrc[0], runesrc[1]) {
-					fmt.Fprint(h.output, "..")
+					h.pad1(2)
 				} else if unicode.IsPrint(r) {
 					charwidth := h.runeWidth(r)
 					fmt.Fprintf(h.output, "%c", r)
 					if charwidth == 1 {
-						fmt.Fprint(h.output, "_")
+						h.pad2(1)
 					}
 				} else {
-					fmt.Fprint(h.output, "..")
+					h.pad1(2)
 				}
 				runesrc = make([]byte, 0, 2)
 				h.cur += 2
@@ -122,13 +148,13 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 			} else if 0xa1 <= ch && ch <= 0xdf {
 				runesrc_u8, err := dec.Bytes([]byte{ch})
 				if err != nil {
-					fmt.Fprint(h.output, ".")
+					h.pad1(1)
 				} else {
 					r, _ := utf8.DecodeRune(runesrc_u8)
 					fmt.Fprintf(h.output, "%c", r)
 				}
 			} else {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 			}
 			h.cur += 1
 			mb = false
@@ -136,7 +162,8 @@ func (h *printable) writeShiftJIS(p []byte) (n int, err error) {
 		if h.cur%uint64(h.width) == 0 {
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		} else if mb && h.cur%uint64(h.width) == 1 {
-			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+			fmt.Fprint(h.output, "\n"+h.start_ch)
+			h.pad2(1)
 		}
 	}
 	h.rest = runesrc
@@ -256,19 +283,19 @@ func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, 
 			if len(runesrc) == 2 {
 				runesrc_u8, err := dec.Bytes(runesrc)
 				if err != nil {
-					fmt.Fprintf(h.output, "..")
+					h.pad1(2)
 				} else {
 					r, _ := utf8.DecodeRune(runesrc_u8)
 					if !utf8.ValidRune(r) || !valid(runesrc[0], runesrc[1]) {
-						fmt.Fprint(h.output, "..")
+						h.pad1(2)
 					} else if unicode.IsPrint(r) {
 						charwidth := h.runeWidth(r)
 						fmt.Fprintf(h.output, "%c", r)
 						if charwidth == 1 {
-							fmt.Fprint(h.output, "_")
+							h.pad2(1)
 						}
 					} else {
-						fmt.Fprint(h.output, "..")
+						h.pad1(2)
 					}
 				}
 				runesrc = make([]byte, 0, 2)
@@ -279,7 +306,7 @@ func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, 
 			}
 		} else {
 			if len(runesrc) > 0 {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 				h.cur += 1
 				runesrc = make([]byte, 0, 2)
 				if h.cur%uint64(h.width) == 0 {
@@ -289,7 +316,7 @@ func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, 
 			if 0x20 <= ch && ch <= 0x7e {
 				fmt.Fprint(h.output, string(ch))
 			} else {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 			}
 			h.cur += 1
 			mb = false
@@ -298,7 +325,8 @@ func (h *printable) writeEUCAny(p []byte, dec *encoding.Decoder, valid func(b1, 
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		}
 		if mb && h.cur%uint64(h.width) == 1 {
-			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+			fmt.Fprint(h.output, "\n"+h.start_ch)
+			h.pad2(1)
 		}
 	}
 	h.rest = runesrc
@@ -340,19 +368,19 @@ func (h *printable) writeBig5(p []byte) (n int, err error) {
 			runesrc = append(runesrc, ch)
 			runesrc_u8, err := dec.Bytes(runesrc)
 			if err != nil {
-				fmt.Fprintf(h.output, "..")
+				h.pad1(2)
 			} else {
 				r, _ := utf8.DecodeRune(runesrc_u8)
 				if !utf8.ValidRune(r) || !valid_big5(runesrc[0], runesrc[1]) {
-					fmt.Fprint(h.output, "..")
+					h.pad1(2)
 				} else if unicode.IsPrint(r) {
 					charwidth := h.runeWidth(r)
 					fmt.Fprintf(h.output, "%c", r)
 					if charwidth == 1 {
-						fmt.Fprint(h.output, "_")
+						h.pad2(1)
 					}
 				} else {
-					fmt.Fprint(h.output, "..")
+					h.pad1(2)
 				}
 			}
 			runesrc = make([]byte, 0, 2)
@@ -360,7 +388,7 @@ func (h *printable) writeBig5(p []byte) (n int, err error) {
 			mb = true
 		} else {
 			if len(runesrc) > 0 {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 				h.cur += 1
 				runesrc = make([]byte, 0, 2)
 				if h.cur%uint64(h.width) == 0 {
@@ -370,7 +398,7 @@ func (h *printable) writeBig5(p []byte) (n int, err error) {
 			if 0x20 <= ch && ch <= 0x7e {
 				fmt.Fprint(h.output, string(ch))
 			} else {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 			}
 			h.cur += 1
 			mb = false
@@ -379,7 +407,8 @@ func (h *printable) writeBig5(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		}
 		if mb && h.cur%uint64(h.width) == 1 {
-			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+			fmt.Fprint(h.output, "\n"+h.start_ch)
+			h.pad2(1)
 		}
 	}
 	h.rest = runesrc
@@ -394,7 +423,7 @@ func (h *printable) writeASCII(p []byte) (n int, err error) {
 		if 0x20 <= ch && ch <= 0x7e {
 			fmt.Fprint(h.output, string(ch))
 		} else {
-			fmt.Fprint(h.output, ".")
+			h.pad1(1)
 		}
 		h.cur += 1
 		if h.cur%uint64(h.width) == 0 {
@@ -426,15 +455,15 @@ func (h *printable) writeUTF8(p []byte) (n int, err error) {
 			if len(h.rest) < 4 {
 				return len(p), nil
 			}
-			fmt.Fprint(h.output, ".")
+			h.pad1(1)
 		} else if !unicode.IsPrint(r) {
-			fmt.Fprint(h.output, ".")
+			h.pad1(1)
 		} else {
 			fmt.Fprintf(h.output, "%c", r)
 		}
 		charwidth := h.runeWidth(r)
 		if curpos+size <= h.width && size > charwidth {
-			fmt.Fprint(h.output, strings.Repeat("_", size-charwidth))
+			h.pad2(size - charwidth)
 		}
 		h.rest = h.rest[size:]
 		if curpos+size >= h.width {
@@ -444,7 +473,8 @@ func (h *printable) writeUTF8(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, "\n")
 			fill := (curpos + size) % h.width
 			if fill > 0 {
-				fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", fill))
+				fmt.Fprint(h.output, h.start_ch)
+				h.pad2(fill)
 			}
 		}
 		h.cur += uint64(size)
@@ -468,12 +498,14 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 	cur := 0
 	if p[0] == 0xff && p[1] == 0xfe {
 		h.lendian = true
-		fmt.Fprint(h.output, h.start_ch+"LE")
+		fmt.Fprint(h.output, h.start_ch)
 		cur = 2
+		h.bom(2, h.lendian)
 	} else if p[0] == 0xfe && p[1] == 0xff {
 		h.lendian = false
-		fmt.Fprint(h.output, h.start_ch+"BE")
+		fmt.Fprint(h.output, h.start_ch)
 		cur = 2
+		h.bom(2, h.lendian)
 	}
 	for cur < len(p) {
 		skip := 0
@@ -496,11 +528,11 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 				slog.Debug("rune", "code1", code, "code2", code2, "rune", rcode)
 				fmt.Fprint(h.output, string(rune(rcode)))
 				if pos+4 < h.width {
-					fmt.Fprint(h.output, "__")
+					h.pad2(2)
 				}
 				skip = 4
 			} else {
-				fmt.Fprint(h.output, ".")
+				h.pad1(1)
 				skip = 1
 			}
 		} else if code < 0x10000 {
@@ -508,12 +540,13 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 			if unicode.IsPrint(ch) {
 				charwidth := h.runeWidth(ch)
 				if charwidth == 1 && pos+1 < h.width {
-					fmt.Fprint(h.output, string(ch)+"_")
+					fmt.Fprint(h.output, string(ch))
+					h.pad2(1)
 				} else {
 					fmt.Fprint(h.output, string(ch))
 				}
 			} else {
-				fmt.Fprint(h.output, "..")
+				h.pad1(2)
 			}
 			skip = 2
 		}
@@ -521,7 +554,8 @@ func (h *printable) writeUTF16(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		}
 		if pos+skip > h.width {
-			fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", pos+skip-h.width))
+			fmt.Fprint(h.output, h.start_ch)
+			h.pad2(pos + skip - h.width)
 		}
 		cur += skip
 	}
@@ -546,12 +580,14 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 	cur := 0
 	if bytes.Equal(p[:4], []byte{0x00, 0x00, 0xfe, 0xff}) {
 		h.lendian = false
-		fmt.Fprint(h.output, h.start_ch+"_BE_")
+		fmt.Fprint(h.output, h.start_ch)
 		cur = 4
+		h.bom(4, h.lendian)
 	} else if bytes.Equal(p[:4], []byte{0xff, 0xfe, 0x00, 0x00}) {
 		h.lendian = true
-		fmt.Fprint(h.output, h.start_ch+"_LE_")
+		fmt.Fprint(h.output, h.start_ch)
 		cur = 4
+		h.bom(4, h.lendian)
 	}
 	for cur < len(p) {
 		skip := 0
@@ -567,13 +603,15 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 			ch := rune(code)
 			if unicode.IsPrint(ch) {
 				charwidth := h.runeWidth(ch)
+				fmt.Fprint(h.output, string(ch))
 				if pos+charwidth < h.width {
-					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", 4-charwidth))
+					h.pad2(4 - charwidth)
 				} else {
-					fmt.Fprint(h.output, string(ch)+strings.Repeat("_", h.width-(pos+charwidth)))
+					h.pad2(h.width - (pos + charwidth))
 				}
 			} else {
-				fmt.Fprint(h.output, ".___")
+				h.pad1(1)
+				h.pad2(3)
 			}
 			skip = 4
 		} else {
@@ -583,7 +621,8 @@ func (h *printable) writeUTF32(p []byte) (n int, err error) {
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		}
 		if pos+skip > h.width {
-			fmt.Fprint(h.output, h.start_ch+strings.Repeat("_", pos+skip-h.width))
+			fmt.Fprint(h.output, h.start_ch)
+			h.pad2(pos + skip - h.width)
 		}
 		cur += skip
 	}
@@ -607,7 +646,7 @@ func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byt
 			continue
 		}
 		if err != nil {
-			fmt.Fprintf(h.output, "..")
+			h.pad1(2)
 			runesrc = runesrc[1:]
 			skip = 1
 		} else {
@@ -615,15 +654,15 @@ func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byt
 			skip = len(runesrc_u8)
 			runesrc = make([]byte, 0, 2)
 			if !utf8.ValidRune(r) || !valid(runesrc_u8) {
-				fmt.Fprint(h.output, strings.Repeat(".", len(runesrc_u8)))
+				h.pad1(len(runesrc_u8))
 			} else if unicode.IsPrint(r) {
 				charwidth := h.runeWidth(r)
 				fmt.Fprintf(h.output, "%c", r)
 				if charwidth == 1 {
-					fmt.Fprint(h.output, strings.Repeat("_", len(runesrc_u8)-charwidth))
+					h.pad2(len(runesrc_u8) - charwidth)
 				}
 			} else {
-				fmt.Fprint(h.output, strings.Repeat(".", len(runesrc_u8)))
+				h.pad1(len(runesrc_u8))
 			}
 		}
 		h.cur += uint64(skip)
@@ -631,7 +670,8 @@ func (h *printable) writeAny(p []byte, dec *encoding.Decoder, valid func(b []byt
 			fmt.Fprint(h.output, h.end_ch+"\n")
 		}
 		if mb && h.cur%uint64(h.width) == 1 {
-			fmt.Fprint(h.output, "\n"+h.start_ch+"_")
+			fmt.Fprint(h.output, "\n"+h.start_ch)
+			h.pad2(1)
 		}
 	}
 	h.rest = runesrc
@@ -688,7 +728,7 @@ func (h *printable) Write(p []byte) (n int, err error) {
 }
 
 func (h *printable) Close() (err error) {
-	fmt.Fprint(h.output, strings.Repeat(".", len(h.rest)))
+	h.pad1(len(h.rest))
 	h.cur += uint64(len(h.rest))
 	if h.cur%uint64(h.width) != 0 {
 		fmt.Fprint(h.output, "\n")
