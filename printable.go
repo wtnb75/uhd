@@ -494,6 +494,11 @@ func getcode_utf16(p []byte, lendian bool) (uint32, error) {
 
 func (h *printable) writeUTF16(p []byte) (n int, err error) {
 	p = append(h.rest, p...)
+	h.rest = nil
+	if len(p) < 2 {
+		h.rest = p
+		return len(p), nil
+	}
 	// check bom
 	cur := 0
 	if p[0] == 0xff && p[1] == 0xfe {
@@ -576,6 +581,11 @@ func getcode_utf32(p []byte, lendian bool) (uint32, error) {
 
 func (h *printable) writeUTF32(p []byte) (n int, err error) {
 	p = append(h.rest, p...)
+	h.rest = nil
+	if len(p) < 4 {
+		h.rest = p
+		return len(p), nil
+	}
 	// check bom
 	cur := 0
 	if bytes.Equal(p[:4], []byte{0x00, 0x00, 0xfe, 0xff}) {
@@ -695,7 +705,7 @@ func (h *printable) Write(p []byte) (n int, err error) {
 	case "utf-32be", "utf32be":
 		h.lendian = false
 		return h.writeUTF32(p)
-	case "utf-23le", "utf32le":
+	case "utf-32le", "utf32le":
 		h.lendian = true
 		return h.writeUTF32(p)
 	case "euc-jp", "eucjp":
