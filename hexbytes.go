@@ -20,7 +20,7 @@ func (h *hexbytes) Write(p []byte) (n int, err error) {
 		} else {
 			fmt.Fprintf(h.output, "0x%02X,", uint8(ch))
 		}
-		if i%h.width == h.width-1 {
+		if (h.cur+uint64(i))%uint64(h.width) == uint64(h.width)-1 {
 			fmt.Fprint(h.output, "\n")
 		} else {
 			fmt.Fprint(h.output, " ")

@@ -169,7 +169,7 @@ func main() {
 	if option.ListCode {
 		fmt.Println("utf-8, utf8")
 		fmt.Println("utf-16, utf16, utf-16be, utf16be, utf-16le, utf16le")
-		fmt.Println("utf-32, utf32, utf-32be, utf32be, utf-23le, utf32le")
+		fmt.Println("utf-32, utf32, utf-32be, utf32be, utf-32le, utf32le")
 		fmt.Println("euc-jp, eucjp")
 		fmt.Println("euc-kr, euckr")
 		fmt.Println("euc-cn, euccn, gb18030")
