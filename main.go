@@ -1,10 +1,12 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -14,14 +16,19 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
+//go:embed .github/skills/uhd-cli/SKILL.md
+var skillContent []byte
+
 var option struct {
-	Verbose  bool   `short:"v" long:"verbose" description:"Enable verbose logging"`
-	Encoding string `long:"encoding" default:"utf-8"`
-	Width    int    `long:"width" default:"16"`
-	Sep      int    `long:"sep" default:"8"`
-	Layout   string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd" choice:"bytes"`
-	ListCode bool   `short:"l" long:"list-codes" description:"list encoding"`
-	NoColor  bool   `long:"no-color" description:"disable color output"`
+	Verbose      bool   `short:"v" long:"verbose" description:"Enable verbose logging"`
+	Encoding     string `long:"encoding" default:"utf-8"`
+	Width        int    `long:"width" default:"16"`
+	Sep          int    `long:"sep" default:"8"`
+	Layout       string `long:"layout" default:"jhd" choice:"hexdump" choice:"jhd" choice:"bytes"`
+	ListCode     bool   `short:"l" long:"list-codes" description:"list encoding"`
+	NoColor      bool   `long:"no-color" description:"disable color output"`
+	InstallSkill bool   `long:"install-skill" description:"install Copilot skill to user skill directory"`
+	SkillTarget  string `long:"skill-target" default:"copilot" choice:"copilot" choice:"agents" choice:"claude" description:"target skill directory (~/.copilot, ~/.agents, ~/.claude)"`
 }
 
 type column struct {
@@ -123,10 +130,34 @@ func do_uhd(filename string) (err error) {
 	return nil
 }
 
+func install_skill() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	destDir := filepath.Join(home, "."+option.SkillTarget, "skills", "uhd-cli")
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("cannot create skill directory %s: %w", destDir, err)
+	}
+	destFile := filepath.Join(destDir, "SKILL.md")
+	if err := os.WriteFile(destFile, skillContent, 0o644); err != nil {
+		return fmt.Errorf("cannot write skill file %s: %w", destFile, err)
+	}
+	fmt.Printf("installed: %s\n", destFile)
+	return nil
+}
+
 func main() {
 	parser := flags.NewParser(&option, flags.Default)
 	parsed, err := parser.Parse()
 	if err != nil {
+		return
+	}
+	if option.InstallSkill {
+		if err := install_skill(); err != nil {
+			slog.Error("install-skill", "err", err)
+			os.Exit(1)
+		}
 		return
 	}
 	if option.NoColor {
