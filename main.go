@@ -29,6 +29,7 @@ var option struct {
 	NoColor      bool   `long:"no-color" description:"disable color output"`
 	InstallSkill bool   `long:"install-skill" description:"install Copilot skill to user skill directory"`
 	SkillTarget  string `long:"skill-target" default:"copilot" choice:"copilot" choice:"agents" choice:"claude" description:"target skill directory (~/.copilot, ~/.agents, ~/.claude)"`
+	Version      bool   `short:"V" long:"version" description:"show version and exit"`
 }
 
 type column struct {
@@ -151,6 +152,10 @@ func main() {
 	parser := flags.NewParser(&option, flags.Default)
 	parsed, err := parser.Parse()
 	if err != nil {
+		return
+	}
+	if option.Version {
+		fmt.Println("uhd", version, "hash", commit, "build", date)
 		return
 	}
 	if option.InstallSkill {
