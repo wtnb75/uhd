@@ -13,7 +13,7 @@ type hexrev struct {
 
 func (h *hexrev) Write(p []byte) (n int, err error) {
 	var ch byte
-	for _, hexstr := range strings.Split(string(p), " ") {
+	for hexstr := range strings.SplitSeq(string(p), " ") {
 		n, err := fmt.Sscanf(hexstr, "%02X", &ch)
 		if err == io.EOF {
 			slog.Debug("eof", "hexstr", hexstr)
