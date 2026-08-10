@@ -106,15 +106,13 @@ func do_uhd(filename string) (err error) {
 	wr := io.MultiWriter(writers...)
 	pst := NewPaster(os.Stdout, dupidx, readers...)
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		slog.Debug("widths", "values", widths)
 		if err := pst.Process(widths...); err != nil {
 			slog.Error("paster", "err", err)
 		}
 		slog.Debug("finished", "file", filename)
-		wg.Done()
-	}()
+	})
 	written, err := io.Copy(wr, rd)
 	slog.Debug("copy", "file", filename, "written", written, "err", err)
 	if err != nil {

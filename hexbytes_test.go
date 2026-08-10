@@ -26,7 +26,7 @@ func TestHexbytes(t *testing.T) {
 		t.Error("short write", "n", n, "expected", len(input))
 	}
 	parsed := make([]int, 0, len(input))
-	for _, token := range strings.Split(buf.String(), ",") {
+	for token := range strings.SplitSeq(buf.String(), ",") {
 		tk := strings.Trim(token, " \n")
 		if tk == "" {
 			continue

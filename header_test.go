@@ -22,7 +22,7 @@ func TestHeader(t *testing.T) {
 		t.Error("short write", "n", n, "expected", 128)
 	}
 	rd := bufio.NewReader(buf)
-	for i := 0; i < 128/16; i++ {
+	for i := range 128 / 16 {
 		line, _, err := rd.ReadLine()
 		if err != nil {
 			t.Error("readline", "err", err)
